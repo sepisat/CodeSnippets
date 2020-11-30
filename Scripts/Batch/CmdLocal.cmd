@@ -1,5 +1,5 @@
-:: DO NOT USE @ECHO OFF/ON IN THIS BATCH FILE
-:: It will alter the echo state of the command shell 
+:: DO NOT USE @ECHO OFF/ON IN THIS BATCH FILE,
+:: It will alter the echo state of the command shell.
 :: ---------------------- Help ----------------------
 ::=::CMDLOCAL
 ::=::A tool to change the state of CMD Extensions or Delayed Expansion at command line
@@ -9,28 +9,20 @@
 ::=::Use at command line only.
 :: ---------------------- Help ----------------------
 
-:: ---------------------- Bootstrapper ----------------------
+:: /---------------------- Trampoline ----------------------
 @setlocal EnableExtensions DisableDelayedExpansion
-@(
-    set "#f0=%~f0"
-    set "processBranch=1"
-)
+@set "#f0=%~f0"
 @if "%~d0"=="\\" (
     set "tokens=2"
     if "%#f0:~0,4%"=="\\.\" (
-        if "%#f0:~5,1%"==":" (
-            set "tokens=3"
-        ) else (
-            set "processBranch=0"
-        )
+        REM \\.\X:\path...
+        if "%#f0:~5,1%"==":" set "tokens=3"
     )
 ) else set "tokens=3"
-@(
-    endlocal
-    if %processBranch% NEQ 0 for /F "tokens=%tokens% delims=:" %%L in ("%~0") do @goto %%L
-)
+@endlocal & for /F "tokens=%tokens% delims=:" %%L in ("%~0") do @goto %%L
+:: ---------------------- Trampoline ----------------------/
 
-:: ---------------------- Startup Branch ----------------------
+:: /---------------------- Bootstrapper ----------------------
 @setlocal EnableExtensions DisableDelayedExpansion
 @(
     set "@ReturnToCaller=(goto)"
@@ -51,32 +43,40 @@
 ) else (
     set "Args=!Args:~0,-1!"
 )
-@if defined //Help (
-    call :DisplayHelp
-    exit /b
-)
+@if defined //Help call :DisplayHelp & exit /b
+
+
 
 @set @CmdSetLocal.Work=!@CmdSetLocal.Work! !Args!
 @(
     %@ReturnToCaller%
     %@CmdSetLocal.Work%
-)9>&2 8>&1 1>nul 2>&1
+)9>&2 2>nul
 
 >&2 @echo ASSERT: UNREACHABLE_CODE
 ()
+:: ---------------------- Bootstrapper ----------------------/
 
+:: /---------------------- Worker ----------------------
 :CmdSetLocal.Work // Branch
+:: It is safe to use 'ECHO OFF' here.
+@echo off
 setlocal EnableExtensions
-(
-    endlocal
-    REM This will become the permanent setlocal (Memory leak!)
-    2>&9 setlocal %* || (setlocal EnableExtensions & exit /b)
-)
+endlocal & (
+    REM This will become the permanent setlocal (It's a memory leak)
+    setlocal %* && (
+        echo The operation was successfull.
+    ) || (
+        setlocal EnableExtensions
+        exit /b
+    )
+)2>&9
 :: This one will be discarded
 setlocal
->&8 echo/
+echo/
 :: Deliberate Syntax Error - DO NOT REMOVE THE NEXT LINE
 ()
+:: ---------------------- Worker ----------------------/
 
 :DisplayHelp  // Function
 @(
